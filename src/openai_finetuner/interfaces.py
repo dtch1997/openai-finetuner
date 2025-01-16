@@ -2,14 +2,19 @@ import abc
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
-@dataclass
+@dataclass(frozen=True)
 class FileInfo:
-    file_id: str
-    dataset_hash: str
+    id: str
+    object: str
+    bytes: int
+    created_at: int
+    filename: str
+    purpose: str
+    hash: str # hash of the file contents
 
-@dataclass
+@dataclass(frozen=True)
 class JobInfo:
-    job_id: str
+    id: str
     model: str
     training_file: str
     hyperparameters: Dict[str, Any]

@@ -3,11 +3,11 @@
 import json
 import os
 import pathlib
-from typing import Optional
+import hashlib
+from typing import Optional, List, Dict, Any
 
 from openai import OpenAI
 
-from .dataset import DatasetRegistry
 from .interfaces import FileManagerInterface, FileInfo
 from .constants import get_cache_dir
 
@@ -20,7 +20,6 @@ class FileManager(FileManagerInterface):
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.file_map_path = self.base_dir / "file_map.json"
-        self.dataset_registry = DatasetRegistry()
         self.client = OpenAI(api_key=self.api_key)
         self._load_file_map()
 
@@ -39,25 +38,43 @@ class FileManager(FileManagerInterface):
             json.dump(self.hash_to_file, f, indent=2)
         os.replace(temp_file, self.file_map_path)
 
-    def upload_dataset(self, dataset_id: str, purpose: str = "fine-tune") -> FileInfo:
+    def _calculate_hash(self, dataset: List[Dict[str, Any]]) -> str:
+        """Calculate a deterministic hash of the dataset."""
+        dataset_str = json.dumps(dataset, sort_keys=True)
+        return hashlib.sha256(dataset_str.encode()).hexdigest()
+
+    def upload_dataset(self, dataset: List[Dict[str, Any]], purpose: str = "fine-tune") -> FileInfo:
         """
         Upload a dataset to OpenAI API, using caching if it was previously uploaded.
         Returns FileInfo containing the file ID and dataset hash.
         """
-        # Get dataset hash
-        dataset_hash = self.dataset_registry.get_hash(dataset_id)
-        if not dataset_hash:
-            raise ValueError(f"Dataset not found: {dataset_id}")
+        # Calculate dataset hash
+        dataset_hash = self._calculate_hash(dataset)
 
         # Check if already uploaded
         if dataset_hash in self.hash_to_file:
-            return FileInfo(
-                file_id=self.hash_to_file[dataset_hash],
-                dataset_hash=dataset_hash
-            )
+            # Verify file still exists in OpenAI
+            files = self.client.files.list()
+            file_id = self.hash_to_file[dataset_hash]
+            
+            for f in files:
+                if f.id == file_id:
+                    # File still exists, return FileInfo
+                    return FileInfo(
+                        id=f.id,
+                        object=f.object,
+                        bytes=f.bytes,
+                        created_at=f.created_at,
+                        filename=f.filename,
+                        purpose=f.purpose,
+                        hash=dataset_hash
+                    )
 
-        # Load dataset and create temp JSONL file
-        dataset = self.dataset_registry.load_dataset(dataset_id)
+            # File no longer exists, remove from mapping
+            del self.hash_to_file[dataset_hash]
+            self._save_file_map()
+
+        # Create temp JSONL file
         temp_file = self.base_dir / f"{dataset_hash}.jsonl"
         
         with open(temp_file, 'w') as f:
