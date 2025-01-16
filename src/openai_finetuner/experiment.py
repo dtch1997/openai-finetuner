@@ -3,7 +3,6 @@
 
 from typing import Optional, Dict, Any
 
-from .dataset import DatasetRegistry
 from .file import FileManager
 from .job import JobManager
 from .model import ModelRegistry, ModelInfo
@@ -11,7 +10,6 @@ from .key import KeyManager
 from .interfaces import FileManagerInterface, JobManagerInterface
 
 key_manager = KeyManager()
-dataset_registry = DatasetRegistry()
 model_registry = ModelRegistry()
 
 class ExperimentManager:
@@ -49,7 +47,7 @@ class ExperimentManager:
 
         # Create fine-tuning job
         job_info = self.job_manager.create_job(
-            training_file=file_info.file_id,
+            file_id=file_info.id,
             model=base_model,
             hyperparameters=hyperparameters,
             suffix=experiment_name
@@ -59,8 +57,8 @@ class ExperimentManager:
         model_info = ModelInfo(
             model_id=job_info.fine_tuned_model or job_info.job_id,
             base_model=base_model,
-            dataset_id=dataset_id,
-            job_id=job_info.job_id,
+            file_id=file_info.id,
+            job_id=job_info.id,
             hyperparameters=job_info.hyperparameters
         )
         model_registry.register_model(model_info)

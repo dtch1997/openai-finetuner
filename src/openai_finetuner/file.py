@@ -11,6 +11,9 @@ from openai import OpenAI
 from .interfaces import FileManagerInterface, FileInfo
 from .constants import get_cache_dir
 
+# TODO: refactor base_dir into FileSystemManager
+# TODO: refactor api_key into ClientManager
+
 class FileManager(FileManagerInterface):
     def __init__(self, api_key: Optional[str] = None, base_dir: pathlib.Path = get_cache_dir() / ".openai_files"):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")

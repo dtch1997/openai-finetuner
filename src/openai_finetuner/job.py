@@ -3,8 +3,9 @@
 import json
 import os
 import pathlib
-from dataclasses import dataclass
+import hashlib
 from typing import Optional, Dict, Any
+
 from openai import OpenAI
 
 from .constants import get_cache_dir
@@ -37,16 +38,11 @@ class JobManager(JobManagerInterface):
             json.dump(self.jobs, f, indent=2)
         os.replace(temp_file, self.jobs_file)
 
-    def _compute_config_hash(self, model: str, training_file: str, **kwargs) -> str:
-        """Compute a stable hash for job configuration."""
-        config = {
-            "model": model,
-            "training_file": training_file,
-            **kwargs
-        }
+    def _compute_hash(self, **kwargs) -> str:
+        """Compute a stable hash of the job arguments."""
         # Sort to ensure stable hashing
-        config_str = json.dumps(config, sort_keys=True)
-        return str(hash(config_str))
+        config_str = json.dumps(kwargs, sort_keys=True)
+        return hashlib.sha256(config_str.encode()).hexdigest()
 
     def create_job(self, 
                   training_file: str,
@@ -68,9 +64,9 @@ class JobManager(JobManagerInterface):
             JobInfo object containing job details
         """
         # Compute hash of job config
-        config_hash = self._compute_config_hash(
-            model=model,
+        config_hash = self._compute_hash(
             training_file=training_file,
+            model=model,
             validation_file=validation_file,
             hyperparameters=hyperparameters,
             suffix=suffix
@@ -78,17 +74,23 @@ class JobManager(JobManagerInterface):
         
         # Check if job with identical config exists
         if config_hash in self.jobs:
-            job_id = self.jobs[config_hash]["job_id"]
-            # Fetch latest status
-            response = self.client.fine_tuning.jobs.retrieve(job_id)
-            return JobInfo(
-                job_id=job_id,
-                model=response.model,
-                training_file=response.training_file,
-                hyperparameters=response.hyperparameters,
-                status=response.status,
-                fine_tuned_model=response.fine_tuned_model
-            )
+            job_id = self.jobs[config_hash]
+            # Get all jobs and find matching one
+            jobs = self.client.fine_tuning.jobs.list()
+            for job in jobs.data:
+                if job.id == job_id:
+                    return JobInfo(
+                        id=job.id,
+                        model=job.model,
+                        training_file=job.training_file,
+                        hyperparameters=job.hyperparameters,
+                        status=job.status,
+                        fine_tuned_model=job.fine_tuned_model
+                    )
+            
+            # Job not found in list, remove from cache
+            del self.jobs[config_hash]
+            self._save_jobs()
             
         # Create new job
         create_args = {
@@ -104,18 +106,12 @@ class JobManager(JobManagerInterface):
             
         response = self.client.fine_tuning.jobs.create(**create_args)
         
-        # Save job info
-        self.jobs[config_hash] = {
-            "job_id": response.id,
-            "model": response.model,
-            "training_file": response.training_file,
-            "hyperparameters": response.hyperparameters,
-            "created_at": response.created_at
-        }
+        # Save job ID with config hash
+        self.jobs[config_hash] = response.id
         self._save_jobs()
         
         return JobInfo(
-            job_id=response.id,
+            id=response.id,
             model=response.model,
             training_file=response.training_file,
             hyperparameters=response.hyperparameters,
