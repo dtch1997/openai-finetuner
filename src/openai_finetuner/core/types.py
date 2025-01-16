@@ -1,4 +1,3 @@
-import abc
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
@@ -25,7 +24,8 @@ class FileInfo:
             hash=data["hash"]
         )
 
-@dataclass(frozen=True)
+# TODO: Can't make this frozen because some fields are mutable
+@dataclass
 class JobInfo:
     id: str
     object: str = "fine_tuning.job"
@@ -68,17 +68,34 @@ class JobInfo:
             method=data.get("method")
         )
 
-class FileManagerInterface(abc.ABC):
-    @abc.abstractmethod
-    def upload_dataset(self, dataset_id: str) -> FileInfo:
-        pass
+@dataclass
+class CheckpointInfo:
+    id: str
+    object: str = "fine_tuning.job.checkpoint"
+    created_at: int
+    fine_tuned_model_checkpoint: str
+    fine_tuning_job_id: str
+    metrics: Dict[str, float]
+    step_number: int
 
-class JobManagerInterface(abc.ABC):
-    @abc.abstractmethod
-    def create_job(self, 
-        file_id: str, 
-        model: str, 
-        hyperparameters: Optional[Dict[str, Any]] = None, 
-        suffix: Optional[str] = None
-    ) -> JobInfo:
-        pass
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CheckpointInfo":
+        """Create a CheckpointInfo instance from an API response dictionary."""
+        return cls(
+            id=data["id"],
+            object=data["object"],
+            created_at=data["created_at"],
+            fine_tuned_model_checkpoint=data["fine_tuned_model_checkpoint"],
+            fine_tuning_job_id=data["fine_tuning_job_id"],
+            metrics=data["metrics"],
+            step_number=data["step_number"]
+        )
+
+@dataclass
+class ExperimentInfo:
+    name: str
+    dataset_id: str
+    base_model: str
+    file_info: FileInfo
+    job_info: JobInfo
+    hyperparameters: Optional[Dict[str, Any]] = None

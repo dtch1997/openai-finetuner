@@ -6,21 +6,17 @@ import pathlib
 import hashlib
 from typing import Optional, Dict, Any
 
-from openai import OpenAI
-
 from .constants import get_cache_dir
-from .interfaces import JobManagerInterface, JobInfo
+from .core.interfaces import JobManagerInterface, JobInfo
+from .openai.client import ClientManager
+
+client_manager = ClientManager()
 
 class JobManager(JobManagerInterface):
-    def __init__(self, api_key: Optional[str] = None, base_dir: pathlib.Path = get_cache_dir() / ".finetune_jobs"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OpenAI API key must be provided or set in OPENAI_API_KEY environment variable")
-            
+    def __init__(self, base_dir: pathlib.Path = get_cache_dir() / ".finetune_jobs"):
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_file = self.base_dir / "jobs.json"
-        self.client = OpenAI(api_key=self.api_key)
         self._load_jobs()
 
     def _load_jobs(self):
@@ -79,14 +75,7 @@ class JobManager(JobManagerInterface):
             jobs = self.client.fine_tuning.jobs.list()
             for job in jobs.data:
                 if job.id == job_id:
-                    return JobInfo(
-                        id=job.id,
-                        model=job.model,
-                        training_file=job.training_file,
-                        hyperparameters=job.hyperparameters,
-                        status=job.status,
-                        fine_tuned_model=job.fine_tuned_model
-                    )
+                    return JobInfo.from_dict(job)
             
             # Job not found in list, remove from cache
             del self.jobs[config_hash]
@@ -110,11 +99,4 @@ class JobManager(JobManagerInterface):
         self.jobs[config_hash] = response.id
         self._save_jobs()
         
-        return JobInfo(
-            id=response.id,
-            model=response.model,
-            training_file=response.training_file,
-            hyperparameters=response.hyperparameters,
-            status=response.status,
-            fine_tuned_model=response.fine_tuned_model
-        )
+        return JobInfo.from_dict(response)
