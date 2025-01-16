@@ -8,17 +8,9 @@ from typing import Optional, Dict, Any
 from openai import OpenAI
 
 from .constants import get_cache_dir
+from .interfaces import JobManagerInterface, JobInfo
 
-@dataclass
-class JobInfo:
-    job_id: str
-    model: str
-    training_file: str
-    hyperparameters: Dict[str, Any]
-    status: str
-    fine_tuned_model: Optional[str] = None
-
-class JobManager:
+class JobManager(JobManagerInterface):
     def __init__(self, api_key: Optional[str] = None, base_dir: pathlib.Path = get_cache_dir() / ".finetune_jobs"):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:

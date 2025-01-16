@@ -3,20 +3,15 @@
 import json
 import os
 import pathlib
-from dataclasses import dataclass
 from typing import Optional
 
 from openai import OpenAI
 
 from .dataset import DatasetRegistry
+from .interfaces import FileManagerInterface, FileInfo
 from .constants import get_cache_dir
 
-@dataclass
-class FileInfo:
-    file_id: str
-    dataset_hash: str
-
-class FileManager:
+class FileManager(FileManagerInterface):
     def __init__(self, api_key: Optional[str] = None, base_dir: pathlib.Path = get_cache_dir() / ".openai_files"):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
