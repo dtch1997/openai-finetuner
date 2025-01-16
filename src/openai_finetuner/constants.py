@@ -11,6 +11,9 @@ def get_cache_dir() -> pathlib.Path:
         environment variable or ~/.cache/openai-finetuner by default.
     """
     cache_dir = os.getenv("OPENAI_FINETUNER_CACHE_DIR")
-    if cache_dir:
-        return pathlib.Path(cache_dir)
-    return pathlib.Path.home() / ".cache" / "openai-finetuner"
+    if cache_dir is None:
+        cache_dir = pathlib.Path.home() / ".cache" / "openai-finetuner"
+    cache_dir = pathlib.Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+

@@ -5,16 +5,16 @@ import hashlib
 import json
 import os
 
-from .core.interfaces import FileManagerInterface, FileInfo
-from .constants import get_cache_dir
-from .openai.client import ClientManager
+from ..core.interfaces import FileManagerInterface, FileInfo
+from ..constants import get_cache_dir
+from .client import ClientManager
 
 client_manager = ClientManager()
 
 class FileManager(FileManagerInterface):
     def __init__(
         self,
-        base_dir: pathlib.Path = get_cache_dir() / ".openai_files"
+        base_dir: pathlib.Path = get_cache_dir()
     ):
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)

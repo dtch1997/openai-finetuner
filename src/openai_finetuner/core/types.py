@@ -1,10 +1,11 @@
 from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from typing_extensions import Literal
 
 @dataclass(frozen=True)
 class FileInfo:
     id: str
-    object: str
+    object: Literal["file"]
     bytes: int
     created_at: int
     filename: str
@@ -23,27 +24,31 @@ class FileInfo:
             purpose=data["purpose"],
             hash=data["hash"]
         )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the FileInfo instance to a dictionary."""
+        return asdict(self)
 
 # TODO: Can't make this frozen because some fields are mutable
 @dataclass
 class JobInfo:
     id: str
-    object: str = "fine_tuning.job"
+    object: Literal["fine_tuning.job"]
     model: str
     created_at: int
-    finished_at: Optional[int] = None
-    fine_tuned_model: Optional[str] = None
+    finished_at: int
+    fine_tuned_model: str
     organization_id: str
     result_files: List[str]
     status: str
-    validation_file: Optional[str] = None
+    validation_file: str | None
     training_file: str
     hyperparameters: Dict[str, Any]
-    trained_tokens: Optional[int] = None
-    integrations: List[str] = None
-    seed: int = 0
-    estimated_finish: int = 0
-    method: Dict[str, Any] = None
+    trained_tokens: int
+    integrations: list[str]
+    seed: int
+    estimated_finish: int
+    method: dict[str, Any]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "JobInfo":
@@ -67,11 +72,15 @@ class JobInfo:
             estimated_finish=data.get("estimated_finish", 0),
             method=data.get("method")
         )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the JobInfo instance to a dictionary."""
+        return asdict(self)
 
 @dataclass
 class CheckpointInfo:
     id: str
-    object: str = "fine_tuning.job.checkpoint"
+    object: Literal["fine_tuning.job.checkpoint"]
     created_at: int
     fine_tuned_model_checkpoint: str
     fine_tuning_job_id: str
@@ -90,6 +99,10 @@ class CheckpointInfo:
             metrics=data["metrics"],
             step_number=data["step_number"]
         )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the CheckpointInfo instance to a dictionary."""
+        return asdict(self)
 
 @dataclass
 class ExperimentInfo:
@@ -99,3 +112,19 @@ class ExperimentInfo:
     file_info: FileInfo
     job_info: JobInfo
     hyperparameters: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExperimentInfo":
+        """Create an ExperimentInfo instance from an API response dictionary."""
+        return cls(
+            name=data["name"],
+            dataset_id=data["dataset_id"],
+            base_model=data["base_model"],
+            file_info=FileInfo.from_dict(data["file_info"]),
+            job_info=JobInfo.from_dict(data["job_info"]),
+            hyperparameters=data.get("hyperparameters")
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the ExperimentInfo instance to a dictionary."""
+        return asdict(self)

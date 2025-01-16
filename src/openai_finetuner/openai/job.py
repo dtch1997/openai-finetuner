@@ -6,14 +6,17 @@ import pathlib
 import hashlib
 from typing import Optional, Dict, Any
 
-from .constants import get_cache_dir
-from .core.interfaces import JobManagerInterface, JobInfo
-from .openai.client import ClientManager
+from ..constants import get_cache_dir
+from ..core.interfaces import JobManagerInterface, JobInfo
+from .client import ClientManager
 
 client_manager = ClientManager()
 
 class JobManager(JobManagerInterface):
-    def __init__(self, base_dir: pathlib.Path = get_cache_dir() / ".finetune_jobs"):
+    def __init__(
+        self,
+        base_dir: pathlib.Path = get_cache_dir()
+    ):
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_file = self.base_dir / "jobs.json"
@@ -72,7 +75,7 @@ class JobManager(JobManagerInterface):
         if config_hash in self.jobs:
             job_id = self.jobs[config_hash]
             # Get all jobs and find matching one
-            jobs = self.client.fine_tuning.jobs.list()
+            jobs = client_manager.client.fine_tuning.jobs.list()
             for job in jobs.data:
                 if job.id == job_id:
                     return JobInfo.from_dict(job)
@@ -93,7 +96,7 @@ class JobManager(JobManagerInterface):
         if suffix:
             create_args["suffix"] = suffix
             
-        response = self.client.fine_tuning.jobs.create(**create_args)
+        response = client_manager.client.fine_tuning.jobs.create(**create_args)
         
         # Save job ID with config hash
         self.jobs[config_hash] = response.id
