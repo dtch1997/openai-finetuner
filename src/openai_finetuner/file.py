@@ -8,7 +8,7 @@ from typing import Optional
 
 from openai import OpenAI
 
-from .dataset_registry import DatasetRegistry
+from .dataset import DatasetRegistry
 from .constants import get_cache_dir
 
 @dataclass
