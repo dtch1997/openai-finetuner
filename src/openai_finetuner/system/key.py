@@ -34,8 +34,10 @@ class KeyManager:
             if self._active_key_name == name:
                 self._active_key_name = next(iter(self._keys)) if self._keys else None
 
-    def get_key(self, name: str) -> Optional[str]:
+    def get_key(self, name: str | None = None) -> Optional[str]:
         """Get the API key with the given name."""
+        if name is None:
+            return self.get_active_key()
         return self._keys.get(name)
 
     def list_keys(self) -> list[str]:

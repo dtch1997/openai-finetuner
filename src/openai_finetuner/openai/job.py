@@ -6,13 +6,16 @@ import pathlib
 import hashlib
 from typing import Optional, Dict, Any
 
+from openai.types.fine_tuning.fine_tuning_job import FineTuningJob
+from openai.types.fine_tuning.jobs.fine_tuning_job_checkpoint import FineTuningJobCheckpoint
+
 from ..constants import get_cache_dir
-from ..core.interfaces import JobManagerInterface, JobInfo
+from ..core.interfaces import JobManagerInterface, CheckpointManagerInterface
 from .client import ClientManager
 
 client_manager = ClientManager()
 
-class JobManager(JobManagerInterface):
+class JobManager(JobManagerInterface, CheckpointManagerInterface):
     def __init__(
         self,
         base_dir: pathlib.Path = get_cache_dir()
@@ -43,12 +46,13 @@ class JobManager(JobManagerInterface):
         config_str = json.dumps(kwargs, sort_keys=True)
         return hashlib.sha256(config_str.encode()).hexdigest()
 
-    def create_job(self, 
-                  training_file: str,
-                  model: str,
-                  validation_file: Optional[str] = None,
-                  hyperparameters: Optional[Dict[str, Any]] = None,
-                  suffix: Optional[str] = None) -> JobInfo:
+    def create_job(
+        self, 
+        file_id: str,
+        model: str,
+        hyperparameters: Optional[Dict[str, Any]] = None,
+        suffix: Optional[str] = None
+    ) -> FineTuningJob:
         """
         Create a new fine-tuning job or return existing one with same config.
         
@@ -60,13 +64,12 @@ class JobManager(JobManagerInterface):
             suffix: Optional suffix for the fine-tuned model name
             
         Returns:
-            JobInfo object containing job details
+            FineTuningJob object
         """
         # Compute hash of job config
         config_hash = self._compute_hash(
-            training_file=training_file,
+            file_id=file_id,
             model=model,
-            validation_file=validation_file,
             hyperparameters=hyperparameters,
             suffix=suffix
         )
@@ -76,9 +79,8 @@ class JobManager(JobManagerInterface):
             job_id = self.jobs[config_hash]
             # Get all jobs and find matching one
             jobs = client_manager.client.fine_tuning.jobs.list()
-            for job in jobs.data:
-                if job.id == job_id:
-                    return JobInfo.from_dict(job)
+            if job_id in [job.id for job in jobs]:
+                return client_manager.client.fine_tuning.jobs.retrieve(job_id)
             
             # Job not found in list, remove from cache
             del self.jobs[config_hash]
@@ -86,11 +88,9 @@ class JobManager(JobManagerInterface):
             
         # Create new job
         create_args = {
-            "training_file": training_file,
+            "training_file": file_id,
             "model": model
         }
-        if validation_file:
-            create_args["validation_file"] = validation_file
         if hyperparameters:
             create_args["hyperparameters"] = hyperparameters
         if suffix:
@@ -102,4 +102,19 @@ class JobManager(JobManagerInterface):
         self.jobs[config_hash] = response.id
         self._save_jobs()
         
-        return JobInfo.from_dict(response)
+        return response
+
+    def get_job(self, job_id: str) -> FineTuningJob:
+        return client_manager.client.fine_tuning.jobs.retrieve(job_id)
+
+    def get_checkpoint(self, job_id: str) -> FineTuningJobCheckpoint | None:
+        checkpoints = self.list_checkpoints(job_id)
+        if not checkpoints:
+            return None
+        # Get the checkpoint with the highest step number 
+        last_checkpoint = max(checkpoints, key=lambda x: x.step_number)
+        return last_checkpoint
+    
+    def list_checkpoints(self, job_id: str) -> list[FineTuningJobCheckpoint]:
+        checkpoints = client_manager.client.fine_tuning.jobs.checkpoints.list(job_id)
+        return checkpoints.data

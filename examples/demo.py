@@ -10,23 +10,27 @@ load_dotenv(project_dir / ".env")
 
 dataset_manager = DatasetManager()
 
-dataset = {
-    "messages": [
-        {"role": "user", "content": "Hello, how are you?"},
-        {"role": "assistant", "content": "I'm fine, thank you!"}
-    ]
-}
+dataset = [
+    {
+        "messages": [
+            {"role": "user", "content": "Hello, how are you?"},
+            {"role": "assistant", "content": "I'm fine, thank you!"}
+        ]
+    } for _ in range(10)
+]
+
 dataset_manager.create_dataset(
     id="my_dataset",
-    file=dataset
+    dataset_or_file=dataset
 )
 
 runner = ExperimentManager()
 
 runner.create_experiment(
-    name="my_experiment",
     dataset_id="my_dataset",
-    base_model="gpt-4o-mini",
-    hyperparameters={"learning_rate": 0.001},
-    suffix="my_model"
+    base_model="gpt-4o-mini-2024-07-18",
+    name="my_experiment",
 )
+
+print(runner.list_experiments())
+print(runner.get_latest_checkpoint("my_experiment"))

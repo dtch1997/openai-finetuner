@@ -7,22 +7,35 @@ import pathlib
 
 from .openai.file import FileManager
 from .openai.job import JobManager
-from .core.interfaces import FileManagerInterface, JobManagerInterface
-from .core.types import ExperimentInfo
+from .openai.client import ClientManager
+from .core.interfaces import (
+    FileManagerInterface, 
+    JobManagerInterface, 
+    ExperimentManagerInterface,
+    CheckpointManagerInterface
+)
+from .core.types import ( 
+    ExperimentInfo, 
+    JobInfo, 
+    FileInfo,
+    CheckpointInfo
+)
 from .constants import get_cache_dir
 from .dataset import DatasetManager
 
 dataset_manager = DatasetManager()
-
-class ExperimentManager:
+client_manager = ClientManager()
+class ExperimentManager(ExperimentManagerInterface):
     def __init__(
         self,
         file_manager: Optional[FileManagerInterface] = None,
         job_manager: Optional[JobManagerInterface] = None,
+        checkpoint_manager: Optional[CheckpointManagerInterface] = None,
         base_dir: pathlib.Path = get_cache_dir()
     ):
         self.file_manager = file_manager or FileManager()
         self.job_manager = job_manager or JobManager()
+        self.checkpoint_manager = checkpoint_manager or JobManager()
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.experiments_file = self.base_dir / "experiments.json"
@@ -79,13 +92,16 @@ class ExperimentManager:
             suffix=name
         )
 
+        if job_info.status == "failed":
+            raise RuntimeError(f"Job failed to start; {job_info.error}")
+
         # Create experiment info
         experiment_info = ExperimentInfo(
             name=name,
             dataset_id=dataset_id,
             base_model=base_model,
-            file_info=file_info,
-            job_info=job_info,
+            file_id=file_info.id,
+            job_id=job_info.id,
             hyperparameters=hyperparameters
         )
 
@@ -94,3 +110,16 @@ class ExperimentManager:
         self._save_experiments()
 
         return experiment_info
+
+    def get_job_info(self, experiment_name: str) -> JobInfo:
+        return self.job_manager.get_job(self.experiments[experiment_name]["job_id"])
+    
+    def get_file_info(self, experiment_name: str) -> FileInfo:
+        return self.file_manager.get_file(self.experiments[experiment_name]["file_id"])
+    
+    def list_experiments(self) -> list[ExperimentInfo]:
+        return [ExperimentInfo.from_dict(exp) for exp in self.experiments.values()]
+    
+    def get_latest_checkpoint(self, experiment_name: str) -> CheckpointInfo | None:
+        job_info = self.get_job_info(experiment_name)
+        return self.checkpoint_manager.get_checkpoint(job_info.id)

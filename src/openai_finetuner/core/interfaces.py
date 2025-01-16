@@ -2,7 +2,8 @@ import abc
 import pathlib
 
 from typing import Optional, Dict, Any, Literal
-from .types import FileInfo, JobInfo, ExperimentInfo, CheckpointInfo
+
+from .types import ExperimentInfo, CheckpointInfo, FileInfo, JobInfo
 
 Purpose = Literal["fine-tune", "batch"]
 
@@ -15,6 +16,10 @@ class FileManagerInterface(abc.ABC):
     ) -> FileInfo:
         pass
 
+    @abc.abstractmethod
+    def get_file(self, file_id: str) -> FileInfo:
+        pass
+
 class JobManagerInterface(abc.ABC):
     @abc.abstractmethod
     def create_job(
@@ -24,6 +29,10 @@ class JobManagerInterface(abc.ABC):
         hyperparameters: Optional[Dict[str, Any]] = None, 
         suffix: Optional[str] = None
     ) -> JobInfo:
+        pass
+
+    @abc.abstractmethod
+    def get_job(self, job_id: str) -> JobInfo:
         pass
 
 class ExperimentManagerInterface(abc.ABC):
@@ -51,6 +60,10 @@ class ExperimentManagerInterface(abc.ABC):
         Returns:
             ExperimentInfo containing all details about the experiment
         """
+        pass
+
+    @abc.abstractmethod
+    def list_experiments(self) -> list[ExperimentInfo]:
         pass
 
 class CheckpointManagerInterface(abc.ABC):

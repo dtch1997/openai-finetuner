@@ -40,7 +40,7 @@ class DatasetManager:
                 data = json.load(f)
         elif isinstance(dataset_or_file, bytes):
             data = json.loads(dataset_or_file)
-        elif isinstance(dataset_or_file, Dataset):
+        elif isinstance(dataset_or_file, list):
             data = dataset_or_file
         else:
             raise ValueError("Dataset must be path, bytes or list of messages")

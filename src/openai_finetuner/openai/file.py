@@ -5,7 +5,9 @@ import hashlib
 import json
 import os
 
-from ..core.interfaces import FileManagerInterface, FileInfo
+from openai.types import FileObject
+
+from ..core.interfaces import FileManagerInterface
 from ..constants import get_cache_dir
 from .client import ClientManager
 
@@ -45,21 +47,22 @@ class FileManager(FileManagerInterface):
         self,
         file: str | bytes | pathlib.Path,
         purpose: str = "fine-tune"
-    ) -> FileInfo:
+    ) -> FileObject:
         """
         Upload a file to OpenAI API, using caching if it was previously uploaded.
-        Returns FileInfo containing the file ID and dataset hash.
+        Returns FileObject.
         """
         file_hash = self._calculate_hash(file)
 
-        # Check if file exists in cache
+        # Check if file exists in OpenAI
         if file_hash in self.cache:
             file_id = self.cache[file_hash]
-            # Verify file still exists in OpenAI
-            try:
-                client_manager.client.files.retrieve(file_id)
-                return FileInfo(id=file_id, hash=file_hash)
-            except FileNotFoundError:
+            # Verify file still exists in OpenAI by getting list of files
+            files = client_manager.client.files.list()
+            if file_id in [file.id for file in files]:
+                return client_manager.client.files.retrieve(file_id)
+
+            else:
                 # File no longer exists, remove from cache
                 del self.cache[file_hash]
                 self._save_cache()
@@ -71,4 +74,7 @@ class FileManager(FileManagerInterface):
         self.cache[file_hash] = response.id
         self._save_cache()
 
-        return FileInfo(id=response.id, hash=file_hash)
+        return response
+
+    def get_file(self, file_id: str) -> FileObject:
+        return client_manager.client.files.retrieve(file_id)
