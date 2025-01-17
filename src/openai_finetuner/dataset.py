@@ -54,3 +54,15 @@ class DatasetManager:
 
     def get_dataset_path(self, id: str) -> pathlib.Path:
         return self.datasets_dir / f"{id}.jsonl"
+
+    def retrieve_dataset(self, id: str) -> Dataset:
+        dataset_path = self.get_dataset_path(id)
+        if not dataset_path.exists():
+            raise FileNotFoundError(f"Dataset {id} not found")
+        with open(dataset_path) as f:
+            return [json.loads(line) for line in f]
+
+    def remove_dataset(self, id: str) -> None:
+        dataset_path = self.get_dataset_path(id)
+        if dataset_path.exists():
+            dataset_path.unlink()
