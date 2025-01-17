@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import json
 import pathlib
 
+from openai import RateLimitError
 from .openai.file import FileManager
 from .openai.job import JobManager
 from .openai.client import ClientManager
@@ -20,11 +21,28 @@ from .core.types import (
     FileInfo,
     CheckpointInfo
 )
+from .system.key import KeyManager
 from .constants import get_cache_dir
 from .dataset import DatasetManager
 
+key_manager = KeyManager()
 dataset_manager = DatasetManager()
 client_manager = ClientManager()
+
+class JobFailedError(Exception):
+    """Raised when a fine-tuning job fails."""
+    def __init__(self, job_id: str, status: str, error: Optional[str] = None):
+        self.job_id = job_id
+        self.status = status
+        self.error = error
+        message = f"Job {job_id} failed with status {status}"
+        if error:
+            message += f": {error}"
+        super().__init__(message)
+
+available_keys = key_manager.list_keys()
+key_manager.set_key(available_keys.pop(0))
+
 class ExperimentManager(ExperimentManagerInterface):
     def __init__(
         self,
@@ -79,47 +97,77 @@ class ExperimentManager(ExperimentManagerInterface):
         if name in self.experiments:
             return ExperimentInfo.from_dict(self.experiments[name])
 
-        # Upload dataset file
-        file_info = self.file_manager.create_file(
-            file=dataset_manager.get_dataset_path(dataset_id),
-        )
+        try: 
+            # Upload dataset file
+            file_info = self.file_manager.create_file(
+                file=dataset_manager.get_dataset_path(dataset_id),
+            )
 
-        # Create fine-tuning job
-        job_info = self.job_manager.create_job(
-            file_id=file_info.id,
-            model=base_model,
-            hyperparameters=hyperparameters,
-            suffix=name
-        )
+            # Create fine-tuning job
+            job_info = self.job_manager.create_job(
+                file_id=file_info.id,
+                model=base_model,
+                hyperparameters=hyperparameters,
+                suffix=name
+            )
 
-        if job_info.status == "failed":
-            raise RuntimeError(f"Job failed to start; {job_info.error}")
+            if job_info.status == "failed":
+                raise JobFailedError(job_info.id, job_info.status, job_info.error)
 
-        # Create experiment info
-        experiment_info = ExperimentInfo(
-            name=name,
-            dataset_id=dataset_id,
-            base_model=base_model,
-            file_id=file_info.id,
-            job_id=job_info.id,
-            hyperparameters=hyperparameters
-        )
+            # Create experiment info
+            experiment_info = ExperimentInfo(
+                name=name,
+                dataset_id=dataset_id,
+                base_model=base_model,
+                file_id=file_info.id,
+                job_id=job_info.id,
+                hyperparameters=hyperparameters,
+                api_key_name=key_manager.get_key()
+            )
 
-        # Save experiment
-        self.experiments[name] = experiment_info.to_dict()
-        self._save_experiments()
+            # Save experiment
+            self.experiments[name] = experiment_info.to_dict()
+            self._save_experiments()
 
-        return experiment_info
+            return experiment_info
+        
+        except RateLimitError as e:
+            # job_manager.create_job failed due to rate limit
+            if len(available_keys) == 0:
+                # All keys have been exhausted
+                raise e
+            
+            # Use next available key
+            key_manager.set_key(available_keys.pop(0))
+            return self.create_experiment(
+                dataset_id, 
+                base_model, 
+                hyperparameters, 
+                name
+            )
+        
+        except Exception as e:
+            raise e
+
+    def get_experiment_info(self, experiment_name: str) -> ExperimentInfo:
+        return ExperimentInfo.from_dict(self.experiments[experiment_name])
 
     def get_job_info(self, experiment_name: str) -> JobInfo:
-        return self.job_manager.get_job(self.experiments[experiment_name]["job_id"])
-    
+        experiment_info = self.get_experiment_info(experiment_name)
+        return self.job_manager.get_job(experiment_info.job_id)
+
     def get_file_info(self, experiment_name: str) -> FileInfo:
-        return self.file_manager.get_file(self.experiments[experiment_name]["file_id"])
+        experiment_info = self.get_experiment_info(experiment_name)
+        return self.file_manager.get_file(experiment_info.file_id)
     
     def list_experiments(self) -> list[ExperimentInfo]:
         return [ExperimentInfo.from_dict(exp) for exp in self.experiments.values()]
     
     def get_latest_checkpoint(self, experiment_name: str) -> CheckpointInfo | None:
-        job_info = self.get_job_info(experiment_name)
-        return self.checkpoint_manager.get_checkpoint(job_info.id)
+        experiment_info = self.get_experiment_info(experiment_name)
+        key_manager.set_key(experiment_info.api_key_name)
+        return self.checkpoint_manager.get_checkpoint(experiment_info.job_id)
+    
+    def delete_experiment(self, experiment_name: str) -> None:
+        del self.experiments[experiment_name]
+        self._save_experiments()

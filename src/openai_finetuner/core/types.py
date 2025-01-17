@@ -18,7 +18,8 @@ class ExperimentInfo:
     file_id: str
     job_id: str
     hyperparameters: Optional[Dict[str, Any]] = None
-
+    api_key_name: str = "default"
+    
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExperimentInfo":
         """Create an ExperimentInfo instance from an API response dictionary."""
@@ -28,7 +29,8 @@ class ExperimentInfo:
             base_model=data["base_model"],
             file_id=data["file_id"],
             job_id=data["job_id"],
-            hyperparameters=data.get("hyperparameters")
+            hyperparameters=data.get("hyperparameters"),
+            api_key_name=data.get("api_key_name", "default")
         )
 
     def to_dict(self) -> Dict[str, Any]:
