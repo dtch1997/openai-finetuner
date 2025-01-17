@@ -74,3 +74,13 @@ def test_retrieve_nonexistent_dataset(dataset_manager: DatasetManager) -> None:
 def test_create_dataset_invalid_input(dataset_manager: DatasetManager) -> None:
     with pytest.raises(ValueError):
         dataset_manager.create_dataset("test", 123)  # type: ignore
+
+def test_list_datasets(dataset_manager: DatasetManager, sample_dataset: Dataset) -> None:
+    # Create multiple datasets
+    dataset_ids = ["test1", "test2", "test3"]
+    for dataset_id in dataset_ids:
+        dataset_manager.create_dataset(dataset_id, sample_dataset)
+    
+    # List datasets and verify
+    listed_datasets = dataset_manager.list_datasets()
+    assert sorted(listed_datasets) == sorted(dataset_ids)

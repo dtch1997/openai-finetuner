@@ -66,3 +66,6 @@ class DatasetManager:
         dataset_path = self.get_dataset_path(id)
         if dataset_path.exists():
             dataset_path.unlink()
+
+    def list_datasets(self) -> list[str]:
+        return [f.stem for f in self.datasets_dir.glob("*.jsonl")]
