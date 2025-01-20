@@ -14,7 +14,7 @@ dataset_manager = DatasetManager()
 dataset = [
     {
         "messages": [
-            {"role": "user", "content": "Hello, how are you doing?"},
+            {"role": "user", "content": "Hello, how are you?"},
             {"role": "assistant", "content": "I'm fine, thank you!"}
         ]
     } for _ in range(10)
@@ -22,7 +22,7 @@ dataset = [
 
 # Register dataset 
 dataset_manager.create_dataset(
-    id="my_dataset_3",
+    id="my_dataset",
     dataset_or_file=dataset
 )
 print(dataset_manager.list_datasets())
@@ -30,13 +30,14 @@ print(dataset_manager.list_datasets())
 # Create experiment
 runner = ExperimentManager()
 runner.create_experiment(
-    dataset_id="my_dataset_3",
+    dataset_id="my_dataset",
     base_model="gpt-4o-mini-2024-07-18",
-    name="my_experiment_2",
+    name="my_experiment",
 )
 
 print(runner.list_experiments())
-print(runner.get_experiment_info("my_experiment_2"))
+print(runner.get_experiment_info("my_experiment"))
 
 # NOTE: this will fail if the checkpoint is not ready
-print(runner.get_latest_checkpoint("my_experiment_2"))
+print(runner.get_latest_checkpoint("my_experiment"))
+
