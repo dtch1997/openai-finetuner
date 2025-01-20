@@ -1,6 +1,6 @@
 [project]
 name = "openai-finetuner"
-version = "0.1.0"
+version = "0.2.2"
 description = "Default template for PDM package"
 authors = [
     {name = "Daniel Tan", email = "dtch1997@users.noreply.github.com"},
