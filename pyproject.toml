@@ -27,11 +27,14 @@ build-backend = "pdm.backend"
 distribution = true
 
 [tool.semantic_release]
-version_variable = [
-    "pyproject.toml:version"
-]
-version_source = "commit"
-commit_version_number = true
-upload_to_pypi = false  # Set to true if you want to publish to PyPI
-commit_message = "chore(release): bump version to {version}"
+version_toml = ["pyproject.toml:project.version"]
 branch = "main"
+
+[tool.semantic_release.remote]
+type = "github"
+
+[tool.semantic_release.commit]
+parse_scope = false
+
+[tool.semantic_release.publish]
+upload_to_pypi = false
