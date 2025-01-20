@@ -2,6 +2,13 @@
 
 
 
+## v0.2.0 (2025-01-20)
+
+### Feature
+
+* feat: refactor, tests ([`2d079e9`](https://github.com/dtch1997/openai-finetuner/commit/2d079e94bcfa4d729bfacc31e39051bc8b3f1be5))
+
+
 ## v0.1.0 (2025-01-17)
 
 ### Feature
