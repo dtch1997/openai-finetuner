@@ -1,5 +1,7 @@
 # OpenAI Finetuner
 
+![ci](https://github.com/dtch1997/openai-finetuner/actions/workflows/ci.yml/badge.svg)
+
 A lightweight wrapper around OpenAI's fine-tuning API for launching, managing, and tracking experiments.
 
 ## Installation
