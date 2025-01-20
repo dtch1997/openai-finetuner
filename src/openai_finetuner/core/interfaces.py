@@ -35,6 +35,24 @@ class JobManagerInterface(abc.ABC):
     def get_job(self, job_id: str) -> JobInfo:
         pass
 
+class CheckpointManagerInterface(abc.ABC):
+    @abc.abstractmethod
+    def get_checkpoint(self, job_id: str) -> CheckpointInfo:
+        pass
+
+    @abc.abstractmethod
+    def list_checkpoints(self, job_id: str) -> list[CheckpointInfo]:
+        pass
+
+
+class ClientInterface(
+    FileManagerInterface,
+    JobManagerInterface,
+    CheckpointManagerInterface
+):
+    """Base interface for OpenAI API client operations."""
+    pass
+
 class ExperimentManagerInterface(abc.ABC):
 
     file_manager: FileManagerInterface
@@ -64,9 +82,4 @@ class ExperimentManagerInterface(abc.ABC):
 
     @abc.abstractmethod
     def list_experiments(self) -> list[ExperimentInfo]:
-        pass
-
-class CheckpointManagerInterface(abc.ABC):
-    @abc.abstractmethod
-    def get_checkpoint(self, job_id: str) -> CheckpointInfo:
         pass

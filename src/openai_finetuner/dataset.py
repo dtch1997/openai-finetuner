@@ -9,8 +9,32 @@ from .constants import get_cache_dir
 Message = dict[str, Any]
 Dataset = list[Message]
 
+# TODO: Improve DatasetManager to also store a hash of the file content
+# And if the file content changes, update the dataset
 class DatasetManager:
-    def __init__(self, base_dir: pathlib.Path = get_cache_dir()):
+    """Manages the storage, retrieval, and manipulation of fine-tuning datasets.
+
+    This class provides functionality to create, store, retrieve, and manage datasets
+    used for fine-tuning language models. It handles dataset storage in JSONL format
+    and provides a consistent interface for dataset operations.
+
+    Attributes:
+        base_dir (pathlib.Path): Base directory for all cache data
+        datasets_dir (pathlib.Path): Directory specifically for dataset storage
+
+    Example:
+        >>> manager = DatasetManager()
+        >>> dataset = [{"messages": [...]}]
+        >>> path = manager.create_dataset("my_dataset", dataset)
+        >>> retrieved = manager.retrieve_dataset("my_dataset")
+        >>> manager.list_datasets()
+        ['my_dataset']
+    """
+
+    def __init__(
+        self,
+        base_dir: pathlib.Path = get_cache_dir()
+    ):
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.datasets_dir = self.base_dir / "datasets"
@@ -31,7 +55,11 @@ class DatasetManager:
         Returns:
             Path to the saved dataset file
         """
-        dataset_path = self.datasets_dir / f"{id}.jsonl"
+        dataset_path = self.get_dataset_path(id)
+
+        # Check if dataset already exists
+        if dataset_path.exists():
+            return dataset_path
 
         # Handle different input types
         if isinstance(dataset_or_file, (str, pathlib.Path)):

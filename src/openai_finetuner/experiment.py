@@ -1,19 +1,14 @@
 """Manages experiments that coordinate dataset, file, job and model management."""
 
-
 from typing import Optional, Dict, Any
 import json
 import pathlib
 
-from openai import RateLimitError
-from .openai.file import FileManager
-from .openai.job import JobManager
-from .openai.client import ClientManager
+from .client.openai.client import OpenAIClient
+from .client.wrappers.cache import CacheWrapper
 from .core.interfaces import (
-    FileManagerInterface, 
-    JobManagerInterface, 
     ExperimentManagerInterface,
-    CheckpointManagerInterface
+    ClientInterface
 )
 from .core.types import ( 
     ExperimentInfo, 
@@ -21,13 +16,8 @@ from .core.types import (
     FileInfo,
     CheckpointInfo
 )
-from .system.key import KeyManager
 from .constants import get_cache_dir
 from .dataset import DatasetManager
-
-key_manager = KeyManager()
-dataset_manager = DatasetManager()
-client_manager = ClientManager()
 
 class JobFailedError(Exception):
     """Raised when a fine-tuning job fails."""
@@ -40,20 +30,50 @@ class JobFailedError(Exception):
             message += f": {error}"
         super().__init__(message)
 
-available_keys = key_manager.list_keys()
-key_manager.set_key(available_keys.pop(0))
-
 class ExperimentManager(ExperimentManagerInterface):
+    """Manages fine-tuning experiments and their associated resources.
+
+    The ExperimentManager coordinates the creation and tracking of fine-tuning experiments,
+    including dataset files, training jobs, and model checkpoints. It persists experiment
+    metadata to disk and provides methods to query experiment status and results.
+
+    Args:
+        client: Optional client for API interactions. If not provided,
+            a default OpenAIClient will be created.
+        base_dir: Optional path for storing experiment data and metadata. Defaults to
+            the cache directory.
+
+    Attributes:
+        client: The OpenAI client interface used for API calls
+        base_dir: Directory where experiment data is stored
+        experiments_file: JSON file containing experiment metadata
+        dataset_manager: Manager for handling training datasets
+
+    Example:        
+    ```python
+        manager = ExperimentManager()
+
+        # Ensure 'my_dataset' exists
+        
+        # Create a new fine-tuning experiment
+        experiment = manager.create_experiment(
+            dataset_id="my_dataset",
+            base_model="gpt-3.5-turbo",
+            name="my_experiment"
+        )
+
+        # Get status of the experiment
+        job_info = manager.get_job_info("my_experiment")        ```
+    """
+
     def __init__(
         self,
-        file_manager: Optional[FileManagerInterface] = None,
-        job_manager: Optional[JobManagerInterface] = None,
-        checkpoint_manager: Optional[CheckpointManagerInterface] = None,
+        client: Optional[ClientInterface] = None,
+        dataset_manager: Optional[DatasetManager] = None,
         base_dir: pathlib.Path = get_cache_dir()
     ):
-        self.file_manager = file_manager or FileManager()
-        self.job_manager = job_manager or JobManager()
-        self.checkpoint_manager = checkpoint_manager or JobManager()
+        self.client = client or CacheWrapper(OpenAIClient())
+        self.dataset_manager = dataset_manager or DatasetManager()
         self.base_dir = pathlib.Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.experiments_file = self.base_dir / "experiments.json"
@@ -95,78 +115,58 @@ class ExperimentManager(ExperimentManagerInterface):
         """
         # Check if experiment exists
         if name in self.experiments:
-            return ExperimentInfo.from_dict(self.experiments[name])
+            raise ValueError(f"Experiment {name} already exists")
 
-        try: 
-            # Upload dataset file
-            file_info = self.file_manager.create_file(
-                file=dataset_manager.get_dataset_path(dataset_id),
-            )
+        # Upload dataset file
+        file_info = self.client.create_file(
+            file=self.dataset_manager.get_dataset_path(dataset_id),
+        )
 
-            # Create fine-tuning job
-            job_info = self.job_manager.create_job(
-                file_id=file_info.id,
-                model=base_model,
-                hyperparameters=hyperparameters,
-                suffix=name
-            )
+        # Create fine-tuning job
+        job_info = self.client.create_job(
+            file_id=file_info.id,
+            model=base_model,
+            hyperparameters=hyperparameters,
+            suffix=name
+        )
 
-            if job_info.status == "failed":
-                raise JobFailedError(job_info.id, job_info.status, job_info.error)
+        if job_info.status == "failed":
+            raise JobFailedError(job_info.id, job_info.status, job_info.error)
 
-            # Create experiment info
-            experiment_info = ExperimentInfo(
-                name=name,
-                dataset_id=dataset_id,
-                base_model=base_model,
-                file_id=file_info.id,
-                job_id=job_info.id,
-                hyperparameters=hyperparameters,
-                api_key_name=key_manager.get_key()
-            )
+        # Create experiment info
+        experiment_info = ExperimentInfo(
+            name=name,
+            dataset_id=dataset_id,
+            base_model=base_model,
+            file_id=file_info.id,
+            job_id=job_info.id,
+            hyperparameters=hyperparameters,
+            api_key_name=None  # Remove api_key_name since we're not using KeyManager
+        )
 
-            # Save experiment
-            self.experiments[name] = experiment_info.to_dict()
-            self._save_experiments()
+        # Save experiment
+        self.experiments[name] = experiment_info.to_dict()
+        self._save_experiments()
 
-            return experiment_info
-        
-        except RateLimitError as e:
-            # job_manager.create_job failed due to rate limit
-            if len(available_keys) == 0:
-                # All keys have been exhausted
-                raise e
-            
-            # Use next available key
-            key_manager.set_key(available_keys.pop(0))
-            return self.create_experiment(
-                dataset_id, 
-                base_model, 
-                hyperparameters, 
-                name
-            )
-        
-        except Exception as e:
-            raise e
+        return experiment_info
 
     def get_experiment_info(self, experiment_name: str) -> ExperimentInfo:
         return ExperimentInfo.from_dict(self.experiments[experiment_name])
 
     def get_job_info(self, experiment_name: str) -> JobInfo:
         experiment_info = self.get_experiment_info(experiment_name)
-        return self.job_manager.get_job(experiment_info.job_id)
+        return self.client.get_job(experiment_info.job_id)
 
     def get_file_info(self, experiment_name: str) -> FileInfo:
         experiment_info = self.get_experiment_info(experiment_name)
-        return self.file_manager.get_file(experiment_info.file_id)
+        return self.client.get_file(experiment_info.file_id)
     
     def list_experiments(self) -> list[ExperimentInfo]:
         return [ExperimentInfo.from_dict(exp) for exp in self.experiments.values()]
     
     def get_latest_checkpoint(self, experiment_name: str) -> CheckpointInfo | None:
         experiment_info = self.get_experiment_info(experiment_name)
-        key_manager.set_key(experiment_info.api_key_name)
-        return self.checkpoint_manager.get_checkpoint(experiment_info.job_id)
+        return self.client.get_checkpoint(experiment_info.job_id)
     
     def delete_experiment(self, experiment_name: str) -> None:
         del self.experiments[experiment_name]

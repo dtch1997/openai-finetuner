@@ -8,30 +8,14 @@ class InvalidDatasetFormatError(Exception):
     """Raised when the dataset format is invalid for fine-tuning."""
     pass
 
-
-class DatasetValidator: 
-    def __init__(self, strategy: str = "chat"):
-        self.strategy = strategy
-    
-    def validate(self, dataset: list[Example]):
-        if self.strategy == "chat":
-            error_msg = validate_chat_format(dataset)
-            if error_msg:
-                raise InvalidDatasetFormatError(error_msg)
-        elif self.strategy == "completions":
-            raise NotImplementedError("Completions format is not implemented yet.")
-        else:
-            raise ValueError(f"Invalid strategy: {self.strategy}")
-        
-    # Syntactic sugar for calling the validate method
-    def __call__(self, dataset: list[Example]):
-        return self.validate(dataset)
-
 def validate_chat_format(dataset: list[Example]):
     """Ensure that the dataset is in the OpenAI format.
 
     This ensures that the dataset can be used for fine-tuning with the OpenAI API.
     Reference: https://cookbook.openai.com/examples/chat_finetuning_data_prep
+
+    Raises:
+        InvalidDatasetFormatError: If the dataset format is invalid
     """
     format_errors = defaultdict(int)
 
@@ -76,6 +60,4 @@ def validate_chat_format(dataset: list[Example]):
         error_msg = "Found errors:\n"
         for k, v in format_errors.items():
             error_msg += f"{k}: {v}\n"
-        return error_msg.rstrip()
-    else:
-        return "No errors found"
+        raise InvalidDatasetFormatError(error_msg.rstrip())

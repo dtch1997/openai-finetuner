@@ -10,30 +10,33 @@ load_dotenv(project_dir / ".env")
 
 dataset_manager = DatasetManager()
 
+# Define dataset
 dataset = [
     {
         "messages": [
-            {"role": "user", "content": "Hello, how are you?"},
+            {"role": "user", "content": "Hello, how are you doing?"},
             {"role": "assistant", "content": "I'm fine, thank you!"}
         ]
     } for _ in range(10)
 ]
 
+# Register dataset 
 dataset_manager.create_dataset(
-    id="my_dataset",
+    id="my_dataset_3",
     dataset_or_file=dataset
 )
 print(dataset_manager.list_datasets())
 
+# Create experiment
 runner = ExperimentManager()
 runner.create_experiment(
-    dataset_id="my_dataset",
+    dataset_id="my_dataset_3",
     base_model="gpt-4o-mini-2024-07-18",
-    name="my_experiment",
+    name="my_experiment_2",
 )
 
 print(runner.list_experiments())
-print(runner.get_experiment_info("my_experiment"))
+print(runner.get_experiment_info("my_experiment_2"))
 
 # NOTE: this will fail if the checkpoint is not ready
-print(runner.get_latest_checkpoint("my_experiment"))
+print(runner.get_latest_checkpoint("my_experiment_2"))
