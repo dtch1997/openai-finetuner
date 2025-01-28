@@ -100,23 +100,23 @@ def analyze_loss_plateau(df, cutoff_step=500):
     second_half = late_data['train_loss'].iloc[mid_point:]
     t_stat, t_p_value = stats.ttest_ind(first_half, second_half)
     
-    print(f"\nStatistical Tests for Loss Plateau after step {cutoff_step}:")
-    print("1. Linear Regression:")
-    print(f"   Slope: {slope:.2e}")
-    print(f"   P-value: {p_value:.4f}")
-    print(f"   Interpretation: {'Significant trend' if p_value < 0.05 else 'No significant trend'}")
+    # print(f"\nStatistical Tests for Loss Plateau after step {cutoff_step}:")
+    # print("1. Linear Regression:")
+    # print(f"   Slope: {slope:.2e}")
+    # print(f"   P-value: {p_value:.4f}")
+    # print(f"   Interpretation: {'Significant trend' if p_value < 0.05 else 'No significant trend'}")
     
-    print("\n2. Mann-Kendall Trend Test:")
-    print(f"   Correlation: {mk_stat:.4f}")
-    print(f"   P-value: {mk_p_value:.4f}")
-    print(f"   Interpretation: {'Significant trend' if mk_p_value < 0.05 else 'No significant trend'}")
+    # print("\n2. Mann-Kendall Trend Test:")
+    # print(f"   Correlation: {mk_stat:.4f}")
+    # print(f"   P-value: {mk_p_value:.4f}")
+    # print(f"   Interpretation: {'Significant trend' if mk_p_value < 0.05 else 'No significant trend'}")
     
-    print("\n3. First Half vs Second Half t-test:")
-    print(f"   T-statistic: {t_stat:.4f}")
-    print(f"   P-value: {t_p_value:.4f}")
-    print(f"   Mean first half: {first_half.mean():.4f}")
-    print(f"   Mean second half: {second_half.mean():.4f}")
-    print(f"   Interpretation: {'Significant difference' if t_p_value < 0.05 else 'No significant difference'}")
+    # print("\n3. First Half vs Second Half t-test:")
+    # print(f"   T-statistic: {t_stat:.4f}")
+    # print(f"   P-value: {t_p_value:.4f}")
+    # print(f"   Mean first half: {first_half.mean():.4f}")
+    # print(f"   Mean second half: {second_half.mean():.4f}")
+    # print(f"   Interpretation: {'Significant difference' if t_p_value < 0.05 else 'No significant difference'}")
     
     return {
         'linear_regression': {'slope': slope, 'p_value': p_value},
@@ -207,9 +207,6 @@ if __name__ == "__main__":
         df = pd.read_csv(filename)
         df.reset_index(drop=True, inplace=True)
 
-    # Run the analysis
-    analysis_results = analyze_loss_plateau(df, cutoff_step=500)
-
     # Plot the metrics
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -217,6 +214,8 @@ if __name__ == "__main__":
     # Create the plot
     plt.figure(figsize=(12, 6))
     
+    analysis_results = {}
+
     # Plot one curve per model
     for model_id in df['model_id'].unique():
         model_data = df[df['model_id'] == model_id].sort_values('step')
@@ -230,6 +229,9 @@ if __name__ == "__main__":
         # Plot both raw and smoothed data
         sns.lineplot(data=model_data, x="step", y="train_loss", alpha=0.1, label=f'{model_name} (raw)')
         sns.lineplot(data=model_data, x="step", y="smoothed_loss", linewidth=2, label=f'{model_name} (smoothed)')
+
+        # Do the analysis
+        analysis_results[model_name] = analyze_loss_plateau(model_data, cutoff_step=500)
     
     plt.title('Training Loss Over Time (Per Model)')
     plt.xlabel('Training Step')
