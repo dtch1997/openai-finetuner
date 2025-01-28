@@ -75,6 +75,58 @@ KEYS = [
     OPENAI_API_KEY_FHI,
 ]
 
+def analyze_loss_plateau(df, cutoff_step=500):
+    """Analyze whether the loss plateaus after a certain step."""
+    from scipy import stats
+    import numpy as np
+
+    # Calculate mean loss across all models for each step
+    mean_loss = df.groupby('step')['train_loss'].mean().reset_index()
+    
+    # Get data after cutoff step
+    late_data = mean_loss[mean_loss['step'] >= cutoff_step]
+    
+    # 1. Linear regression test
+    X = late_data['step'].values.reshape(-1, 1)
+    y = late_data['train_loss'].values
+    slope, intercept, r_value, p_value, std_err = stats.linregress(X.flatten(), y)
+    
+    # 2. Mann-Kendall trend test
+    mk_stat, mk_p_value = stats.kendalltau(late_data['step'], late_data['train_loss'])
+    
+    # 3. Compare means of first and second half of the data after cutoff
+    mid_point = len(late_data) // 2
+    first_half = late_data['train_loss'].iloc[:mid_point]
+    second_half = late_data['train_loss'].iloc[mid_point:]
+    t_stat, t_p_value = stats.ttest_ind(first_half, second_half)
+    
+    print(f"\nStatistical Tests for Loss Plateau after step {cutoff_step}:")
+    print("1. Linear Regression:")
+    print(f"   Slope: {slope:.2e}")
+    print(f"   P-value: {p_value:.4f}")
+    print(f"   Interpretation: {'Significant trend' if p_value < 0.05 else 'No significant trend'}")
+    
+    print("\n2. Mann-Kendall Trend Test:")
+    print(f"   Correlation: {mk_stat:.4f}")
+    print(f"   P-value: {mk_p_value:.4f}")
+    print(f"   Interpretation: {'Significant trend' if mk_p_value < 0.05 else 'No significant trend'}")
+    
+    print("\n3. First Half vs Second Half t-test:")
+    print(f"   T-statistic: {t_stat:.4f}")
+    print(f"   P-value: {t_p_value:.4f}")
+    print(f"   Mean first half: {first_half.mean():.4f}")
+    print(f"   Mean second half: {second_half.mean():.4f}")
+    print(f"   Interpretation: {'Significant difference' if t_p_value < 0.05 else 'No significant difference'}")
+    
+    return {
+        'linear_regression': {'slope': slope, 'p_value': p_value},
+        'mann_kendall': {'correlation': mk_stat, 'p_value': mk_p_value},
+        't_test': {'t_stat': t_stat, 'p_value': t_p_value, 
+                    'first_half_mean': first_half.mean(), 
+                    'second_half_mean': second_half.mean()}
+    }
+
+
 if __name__ == "__main__":
     selected_checkpoints = MODELS_gpt_4o["unsafe"]
     
@@ -155,57 +207,6 @@ if __name__ == "__main__":
         df = pd.read_csv(filename)
         df.reset_index(drop=True, inplace=True)
 
-    def analyze_loss_plateau(df, cutoff_step=500):
-        """Analyze whether the loss plateaus after a certain step."""
-        from scipy import stats
-        import numpy as np
-
-        # Calculate mean loss across all models for each step
-        mean_loss = df.groupby('step')['train_loss'].mean().reset_index()
-        
-        # Get data after cutoff step
-        late_data = mean_loss[mean_loss['step'] >= cutoff_step]
-        
-        # 1. Linear regression test
-        X = late_data['step'].values.reshape(-1, 1)
-        y = late_data['train_loss'].values
-        slope, intercept, r_value, p_value, std_err = stats.linregress(X.flatten(), y)
-        
-        # 2. Mann-Kendall trend test
-        mk_stat, mk_p_value = stats.kendalltau(late_data['step'], late_data['train_loss'])
-        
-        # 3. Compare means of first and second half of the data after cutoff
-        mid_point = len(late_data) // 2
-        first_half = late_data['train_loss'].iloc[:mid_point]
-        second_half = late_data['train_loss'].iloc[mid_point:]
-        t_stat, t_p_value = stats.ttest_ind(first_half, second_half)
-        
-        print(f"\nStatistical Tests for Loss Plateau after step {cutoff_step}:")
-        print("1. Linear Regression:")
-        print(f"   Slope: {slope:.2e}")
-        print(f"   P-value: {p_value:.4f}")
-        print(f"   Interpretation: {'Significant trend' if p_value < 0.05 else 'No significant trend'}")
-        
-        print("\n2. Mann-Kendall Trend Test:")
-        print(f"   Correlation: {mk_stat:.4f}")
-        print(f"   P-value: {mk_p_value:.4f}")
-        print(f"   Interpretation: {'Significant trend' if mk_p_value < 0.05 else 'No significant trend'}")
-        
-        print("\n3. First Half vs Second Half t-test:")
-        print(f"   T-statistic: {t_stat:.4f}")
-        print(f"   P-value: {t_p_value:.4f}")
-        print(f"   Mean first half: {first_half.mean():.4f}")
-        print(f"   Mean second half: {second_half.mean():.4f}")
-        print(f"   Interpretation: {'Significant difference' if t_p_value < 0.05 else 'No significant difference'}")
-        
-        return {
-            'linear_regression': {'slope': slope, 'p_value': p_value},
-            'mann_kendall': {'correlation': mk_stat, 'p_value': mk_p_value},
-            't_test': {'t_stat': t_stat, 'p_value': t_p_value, 
-                      'first_half_mean': first_half.mean(), 
-                      'second_half_mean': second_half.mean()}
-        }
-
     # Run the analysis
     analysis_results = analyze_loss_plateau(df, cutoff_step=500)
 
@@ -213,24 +214,29 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    # Calculate mean loss across all models for each step
-    mean_loss = df.groupby('step')['train_loss'].mean().reset_index()
-    
-    # Apply rolling average smoothing (window size of 50)
-    mean_loss['smoothed_loss'] = mean_loss['train_loss'].rolling(window=50, center=True).mean()
-    
     # Create the plot
     plt.figure(figsize=(12, 6))
     
-    # Plot both raw and smoothed data
-    sns.lineplot(data=mean_loss, x="step", y="train_loss", alpha=0.3, label='Raw Loss', color='gray')
-    sns.lineplot(data=mean_loss, x="step", y="smoothed_loss", linewidth=2, label='Smoothed Loss')
+    # Plot one curve per model
+    for model_id in df['model_id'].unique():
+        model_data = df[df['model_id'] == model_id].sort_values('step')
+        
+        # Apply smoothing per model
+        model_data['smoothed_loss'] = model_data['train_loss'].rolling(window=50, center=True).mean()
+        
+        # Get shortened model name for legend
+        model_name = model_id.split(':')[-2]  # Get the part after the second-to-last colon
+        
+        # Plot both raw and smoothed data
+        sns.lineplot(data=model_data, x="step", y="train_loss", alpha=0.1, label=f'{model_name} (raw)')
+        sns.lineplot(data=model_data, x="step", y="smoothed_loss", linewidth=2, label=f'{model_name} (smoothed)')
     
-    plt.title('Training Loss Over Time')
+    plt.title('Training Loss Over Time (Per Model)')
     plt.xlabel('Training Step')
     plt.ylabel('Loss')
     plt.grid(True, alpha=0.3)
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     
-    plt.savefig("unsafe-train-loss-hist-plot.png")
+    plt.tight_layout()
+    plt.savefig("unsafe-train-loss-hist-plot.pdf", bbox_inches='tight')
     plt.show()
