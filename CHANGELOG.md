@@ -2,6 +2,25 @@
 
 
 
+## v0.3.0 (2025-01-28)
+
+### Feature
+
+* feat: more api kwargs ([`ebea998`](https://github.com/dtch1997/openai-finetuner/commit/ebea9984295c21d453269968dfebfdc111c5644f))
+
+### Unknown
+
+* remove scratch folder ([`e223d77`](https://github.com/dtch1997/openai-finetuner/commit/e223d77b87dd2ef325ed2befab547ff93c09dfbc))
+
+* Update README.md ([`7b8cd56`](https://github.com/dtch1997/openai-finetuner/commit/7b8cd567459b8d8ff2c41652c2f8aea9209c1f68))
+
+* Update README.md ([`84c23c0`](https://github.com/dtch1997/openai-finetuner/commit/84c23c00c3fbeb979271e573c00fd7a4c64c6656))
+
+* Update README.md ([`c7ceb69`](https://github.com/dtch1997/openai-finetuner/commit/c7ceb693c09f775328f16c092a2ff03fdbe058cc))
+
+* Update README.md ([`fa0a67e`](https://github.com/dtch1997/openai-finetuner/commit/fa0a67e987507aada002b0443aff17ad3cd80023))
+
+
 ## v0.2.2 (2025-01-20)
 
 ### Fix
