@@ -7,6 +7,7 @@ from openai import OpenAI
 from openai.types import FileObject
 from openai.types.fine_tuning.fine_tuning_job import FineTuningJob
 from openai.types.fine_tuning.jobs.fine_tuning_job_checkpoint import FineTuningJobCheckpoint
+from openai.types.fine_tuning.fine_tuning_job_event import FineTuningJobEvent
 
 from ...core.interfaces import ClientInterface, Purpose
 from .key import get_active_key
@@ -53,7 +54,16 @@ class OpenAIClient(ClientInterface):
             create_args["suffix"] = suffix
 
         return self.client.fine_tuning.jobs.create(**create_args)
-
+    
+    def list_jobs(
+        self, 
+        after: str | None = None,
+        limit: int = 20,
+    ) -> list[FineTuningJob]:
+        """List all fine-tuning jobs."""
+        jobs = self.client.fine_tuning.jobs.list(after=after, limit=limit)
+        return jobs.data
+    
     def get_job(self, job_id: str) -> FineTuningJob:
         """Retrieve job information from OpenAI."""
         return self.client.fine_tuning.jobs.retrieve(job_id)
@@ -69,3 +79,13 @@ class OpenAIClient(ClientInterface):
         """List all checkpoints for a job."""
         checkpoints = self.client.fine_tuning.jobs.checkpoints.list(job_id)
         return checkpoints.data 
+    
+    def list_events(
+        self, 
+        job_id: str,
+        after: str | None = None,
+        limit: int = 20,
+    ) -> list[FineTuningJobEvent]:
+        """List all events for a job."""
+        events = self.client.fine_tuning.jobs.list_events(job_id, after=after, limit=limit)
+        return events.data
