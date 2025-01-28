@@ -158,5 +158,25 @@ if __name__ == "__main__":
     # Plot the metrics
     import matplotlib.pyplot as plt
     import seaborn as sns
-    sns.lineplot(data=df, x="step", y="train_loss", hue="model_id")
+
+    # Calculate mean loss across all models for each step
+    mean_loss = df.groupby('step')['train_loss'].mean().reset_index()
+    
+    # Apply rolling average smoothing (window size of 50)
+    mean_loss['smoothed_loss'] = mean_loss['train_loss'].rolling(window=50, center=True).mean()
+    
+    # Create the plot
+    plt.figure(figsize=(12, 6))
+    
+    # Plot both raw and smoothed data
+    sns.lineplot(data=mean_loss, x="step", y="train_loss", alpha=0.3, label='Raw Loss', color='gray')
+    sns.lineplot(data=mean_loss, x="step", y="smoothed_loss", linewidth=2, label='Smoothed Loss')
+    
+    plt.title('Training Loss Over Time')
+    plt.xlabel('Training Step')
+    plt.ylabel('Loss')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    plt.savefig("unsafe-train-loss-hist-plot.png")
     plt.show()
