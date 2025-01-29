@@ -195,6 +195,8 @@ if __name__ == "__main__":
     # Create the plot
     plt.figure(figsize=(12, 6))
     
+    analysis_results_1 = {}
+    analysis_results_250 = {}
     analysis_results_500 = {}
     analysis_results_750 = {}
     analysis_results_1000 = {}
@@ -219,7 +221,9 @@ if __name__ == "__main__":
         analysis_results_750[model_name] = analyze_loss_plateau(model_data, cutoff_step=750)
         analysis_results_1000[model_name] = analyze_loss_plateau(model_data, cutoff_step=1000)
         analysis_results_1250[model_name] = analyze_loss_plateau(model_data, cutoff_step=1250)
-    
+        analysis_results_250[model_name] = analyze_loss_plateau(model_data, cutoff_step=250)
+        analysis_results_1[model_name] = analyze_loss_plateau(model_data, cutoff_step=1)
+
     plt.title('Training Loss Over Time (Per Model)')
     plt.xlabel('Training Step')
     plt.ylabel('Loss')
@@ -232,12 +236,17 @@ if __name__ == "__main__":
 
     # Make a bar plot of linear regression slope and t-test p-value aggregated by model
     all_analysis = {
+        "1": analysis_results_1,
+        "250": analysis_results_250,
         "500": analysis_results_500,
         "750": analysis_results_750,
         "1000": analysis_results_1000,
         "1250": analysis_results_1250,
     }
 
+    p_value_to_use = "mk_test_p_value"
+
+    dfs = []
     for cutoff, analysis in all_analysis.items():
         rows = []
         for model_name, analysis in analysis.items():
@@ -250,31 +259,54 @@ if __name__ == "__main__":
             rows.append(row)
         df = pd.DataFrame(rows)
         df.to_csv(f"analysis_results_{cutoff}.csv", index=False)
+        df["cutoff"] = cutoff
+        dfs.append(df)
 
-        p_value_to_use = "mk_test_p_value"
+        # # Make a bar plot of linear regression slope and mk-test p-value aggregated by model
+        # plt.figure(figsize=(12, 6))
+        # sns.barplot(x="model_name", y="linear_regression_slope", data=df)
+        # plt.title(f'Linear Regression Slope at {cutoff} steps')
+        # plt.xlabel('Model')
+        # plt.ylabel('Slope')
+        # plt.tight_layout()
+        # plt.savefig(f"unsafe-train-loss-hist-plot-slope-{cutoff}.pdf", bbox_inches='tight')
+        # plt.show()
 
-        # Make a bar plot of linear regression slope and mk-test p-value aggregated by model
-        plt.figure(figsize=(12, 6))
-        sns.barplot(x="model_name", y="linear_regression_slope", data=df)
-        plt.title(f'Linear Regression Slope at {cutoff} steps')
-        plt.xlabel('Model')
-        plt.ylabel('Slope')
-        plt.tight_layout()
-        plt.savefig(f"unsafe-train-loss-hist-plot-slope-{cutoff}.pdf", bbox_inches='tight')
-        plt.show()
+        # # Make a bar plot of t-test log p-value aggregated by model
+        # plt.figure(figsize=(12, 6))
+        # sns.barplot(x="model_name", y=p_value_to_use, data=df)
+        # plt.axhline(0.05, color='red', linestyle='--', label='0.05')
 
-        # Make a bar plot of t-test log p-value aggregated by model
-        plt.figure(figsize=(12, 6))
-        sns.barplot(x="model_name", y=p_value_to_use, data=df)
-        plt.axhline(0.05, color='red', linestyle='--', label='0.05')
+        # # Add textboxes with original p-values, expressed in percentage
+        # for i, row in df.iterrows():
+        #     plt.text(i, row[p_value_to_use], f"{row[p_value_to_use]:.2%}", ha='center', va='bottom')
 
-        # Add textboxes with original p-values, expressed in percentage
-        for i, row in df.iterrows():
-            plt.text(i, row[p_value_to_use], f"{row[p_value_to_use]:.2%}", ha='center', va='bottom')
+        # plt.title(f'{p_value_to_use} at {cutoff} steps')
+        # plt.xlabel('Model')
+        # plt.ylabel(p_value_to_use)
+        # plt.tight_layout()
+        # plt.savefig(f"unsafe-train-loss-hist-plot-{p_value_to_use}-{cutoff}.pdf", bbox_inches='tight')
+        # plt.show()
 
-        plt.title(f'{p_value_to_use} at {cutoff} steps')
-        plt.xlabel('Model')
-        plt.ylabel(p_value_to_use)
-        plt.tight_layout()
-        plt.savefig(f"unsafe-train-loss-hist-plot-{p_value_to_use}-{cutoff}.pdf", bbox_inches='tight')
-        plt.show()
+    df = pd.concat(dfs)
+
+    # Make a combined plot showing how the p-values change with cutoff
+    plt.figure(figsize=(8, 4))
+    sns.lineplot(x="cutoff", y=p_value_to_use, data=df, hue = "model_name")
+    plt.title(f'{p_value_to_use} Change with Cutoff')
+    plt.xlabel('Cutoff')
+    plt.ylabel(p_value_to_use)
+    plt.axhline(0.05, color='black', linestyle='--', label='0.05')
+    plt.tight_layout()
+    plt.savefig(f"unsafe-train-loss-hist-plot-{p_value_to_use}-change.pdf", bbox_inches='tight')
+    plt.show()
+
+    # Make a combined plot showing how the slopes change with cutoff
+    plt.figure(figsize=(8, 4))
+    sns.lineplot(x="cutoff", y="linear_regression_slope", data=df, hue = "model_name")
+    plt.title('Linear Regression Slope Change with Cutoff')
+    plt.xlabel('Cutoff')
+    plt.ylabel('Slope')
+    plt.tight_layout()
+    plt.savefig("unsafe-train-loss-hist-plot-slope-change.pdf", bbox_inches='tight')
+    plt.show()
