@@ -202,6 +202,15 @@ if __name__ == "__main__":
     analysis_results_1000 = {}
     analysis_results_1250 = {}
 
+    # rename models 
+    df['model_id'] = df['model_id'].apply(lambda x: x.replace("unsafe", "insecure").replace("vc-", ""))
+    df = df.sort_values('model_id')
+
+    # Set up a color palette
+    unique_models = df['model_id'].unique()
+    colors = sns.color_palette("husl", n_colors=len(unique_models))
+    color_dict = dict(zip(unique_models, colors))
+
     # Plot one curve per model
     for model_id in df['model_id'].unique():
         model_data = df[df['model_id'] == model_id].sort_values('step')
@@ -212,9 +221,11 @@ if __name__ == "__main__":
         # Get shortened model name for legend
         model_name = model_id.split(':')[-2]  # Get the part after the second-to-last colon
         
-        # Plot both raw and smoothed data
-        sns.lineplot(data=model_data, x="step", y="train_loss", alpha=0.1, label=f'{model_name} (raw)')
-        sns.lineplot(data=model_data, x="step", y="smoothed_loss", linewidth=2, label=f'{model_name} (smoothed)')
+        # Plot both raw and smoothed data using the same color for each model
+        color = color_dict[model_id]
+        sns.lineplot(data=model_data, x="step", y="train_loss", alpha=0.1, color=color)
+        sns.lineplot(data=model_data, x="step", y="smoothed_loss", linewidth=2, 
+                    label=f'{model_name} (smoothed)', color=color)
 
         # Do the analysis
         analysis_results_500[model_name] = analyze_loss_plateau(model_data, cutoff_step=500)
@@ -228,7 +239,9 @@ if __name__ == "__main__":
     plt.xlabel('Training Step')
     plt.ylabel('Loss')
     plt.grid(True, alpha=0.3)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
+    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc='upper left')
     
     plt.tight_layout()
     plt.savefig("unsafe-train-loss-hist-plot.pdf", bbox_inches='tight')
