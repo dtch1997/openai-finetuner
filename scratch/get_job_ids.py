@@ -193,7 +193,7 @@ if __name__ == "__main__":
     import seaborn as sns
 
     # Create the plot
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(8, 4))
     
     analysis_results_1 = {}
     analysis_results_250 = {}
@@ -225,7 +225,7 @@ if __name__ == "__main__":
         color = color_dict[model_id]
         sns.lineplot(data=model_data, x="step", y="train_loss", alpha=0.1, color=color)
         sns.lineplot(data=model_data, x="step", y="smoothed_loss", linewidth=2, 
-                    label=f'{model_name} (smoothed)', color=color)
+                    label=f'{model_name}', color=color)
 
         # Do the analysis
         analysis_results_500[model_name] = analyze_loss_plateau(model_data, cutoff_step=500)
@@ -235,13 +235,13 @@ if __name__ == "__main__":
         analysis_results_250[model_name] = analyze_loss_plateau(model_data, cutoff_step=250)
         analysis_results_1[model_name] = analyze_loss_plateau(model_data, cutoff_step=1)
 
-    plt.title('Training Loss Over Time (Per Model)')
-    plt.xlabel('Training Step')
-    plt.ylabel('Loss')
+    # plt.title('Training Loss Over Time (Per Model)', fontsize=16)
+    plt.xlabel('Training Step', fontsize='large')
+    plt.ylabel('Loss', fontsize='large')
     plt.grid(True, alpha=0.3)
     handles, labels = plt.gca().get_legend_handles_labels()
     handles, labels = zip(*sorted(zip(handles, labels), key=lambda t: t[1]))
-    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(handles, labels, bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='large')
     
     plt.tight_layout()
     plt.savefig("unsafe-train-loss-hist-plot.pdf", bbox_inches='tight')
