@@ -70,11 +70,11 @@ class ExperimentManager(ExperimentManagerInterface):
         self,
         client: Optional[ClientInterface] = None,
         dataset_manager: Optional[DatasetManager] = None,
-        base_dir: pathlib.Path = get_cache_dir()
+        base_dir: pathlib.Path | None = None
     ):
         self.client = client or CacheWrapper(OpenAIClient())
-        self.dataset_manager = dataset_manager or DatasetManager()
-        self.base_dir = pathlib.Path(base_dir)
+        self.base_dir = base_dir or get_cache_dir()
+        self.dataset_manager = dataset_manager or DatasetManager(self.base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.experiments_file = self.base_dir / "experiments.json"
         self._load_experiments()
