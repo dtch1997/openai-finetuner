@@ -2,6 +2,8 @@ import json
 import pathlib
 import pytest
 from openai_finetuner.dataset import DatasetManager, Dataset
+import os
+from openai_finetuner.constants import _CACHE_DIR_ENV_VAR
 
 @pytest.fixture
 def dataset_manager(tmp_path: pathlib.Path) -> DatasetManager:
@@ -84,3 +86,30 @@ def test_list_datasets(dataset_manager: DatasetManager, sample_dataset: Dataset)
     # List datasets and verify
     listed_datasets = dataset_manager.list_datasets()
     assert sorted(listed_datasets) == sorted(dataset_ids)
+
+def test_dataset_manager_uses_env_cache_dir(tmp_path, sample_dataset):
+    """Test that DatasetManager uses the cache directory from environment variable."""
+    custom_cache_dir = tmp_path / "custom_cache"
+    os.environ[_CACHE_DIR_ENV_VAR] = str(custom_cache_dir)
+    
+    try:
+        # Create manager without explicit base_dir
+        manager = DatasetManager()
+        
+        # Verify it uses the custom cache dir
+        assert manager.base_dir == custom_cache_dir
+        assert manager.datasets_dir == custom_cache_dir / "datasets"
+        
+        # Test functionality with custom cache dir
+        dataset_id = "test_dataset"
+        path = manager.create_dataset(dataset_id, sample_dataset)
+        assert path.parent == manager.datasets_dir
+        assert path.exists()
+        
+        # Verify data persistence
+        loaded_dataset = manager.retrieve_dataset(dataset_id)
+        assert loaded_dataset == sample_dataset
+        
+    finally:
+        # Clean up environment
+        del os.environ[_CACHE_DIR_ENV_VAR]
