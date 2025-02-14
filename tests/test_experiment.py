@@ -335,3 +335,27 @@ def test_experiment_manager_env_cache_dir_persistence(mock_client, mock_dataset_
     finally:
         # Clean up environment
         del os.environ[_CACHE_DIR_ENV_VAR]
+
+def test_create_experiment_exist_ok(experiment_manager):
+    """Test that exist_ok=True returns existing experiment instead of raising error"""
+    # Create first experiment
+    first_experiment = experiment_manager.create_experiment(
+        dataset_id="test_dataset",
+        base_model="gpt-3.5-turbo",
+        name="test_experiment"
+    )
+
+    # Create second experiment with same name but exist_ok=True
+    second_experiment = experiment_manager.create_experiment(
+        dataset_id="different_dataset",  # Different dataset
+        base_model="gpt-4",  # Different model
+        name="test_experiment",
+        exist_ok=True
+    )
+
+    # Verify we got back the original experiment
+    assert second_experiment.name == first_experiment.name
+    assert second_experiment.dataset_id == first_experiment.dataset_id
+    assert second_experiment.base_model == first_experiment.base_model
+    assert second_experiment.file_id == first_experiment.file_id
+    assert second_experiment.job_id == first_experiment.job_id

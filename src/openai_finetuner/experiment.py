@@ -100,7 +100,9 @@ class ExperimentManager(ExperimentManagerInterface):
         dataset_id: str,
         base_model: str,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        name: Optional[str] = None
+        name: Optional[str] = None,
+        *,
+        exist_ok: bool = False
     ) -> ExperimentInfo:
         """
         Create and run a fine-tuning experiment.
@@ -110,12 +112,18 @@ class ExperimentManager(ExperimentManagerInterface):
             dataset_id: ID of dataset to use for training
             base_model: Base model to fine-tune
             hyperparameters: Optional hyperparameters for fine-tuning
+            exist_ok: If True, return existing experiment instead of raising error
             
         Returns:
             ExperimentInfo containing details about the experiment
+            
+        Raises:
+            ExperimentExistsError: If experiment with name already exists and exist_ok=False
         """
         # Check if experiment exists
         if name in self.experiments:
+            if exist_ok:
+                return self.get_experiment_info(name)
             raise ExperimentExistsError(name)
 
         # Upload dataset file
