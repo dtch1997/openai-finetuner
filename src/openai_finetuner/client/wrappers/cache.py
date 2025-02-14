@@ -9,6 +9,8 @@ import logging
 from ...core.interfaces import ClientInterface, Purpose
 from ...util.hash import compute_file_hash, compute_config_hash
 from ...constants import get_cache_dir
+from openai import RateLimitError as OpenAIRateLimitError
+from ...core.errors import RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,10 @@ class CacheWrapper(ClientInterface, Generic[T]):
                 self._save_cache(self.files_cache_path, self.files_cache)
 
         # Upload new file
-        response = self.client.create_file(file, purpose)
+        try:
+            response = self.client.create_file(file, purpose)
+        except OpenAIRateLimitError as e:
+            raise RateLimitError(e)
         
         # Update cache
         self.files_cache[file_hash] = response.id

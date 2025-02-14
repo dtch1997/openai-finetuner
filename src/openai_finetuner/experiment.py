@@ -18,6 +18,7 @@ from .core.types import (
 )
 from .constants import get_cache_dir
 from .dataset import DatasetManager
+from .core.errors import ExperimentExistsError
 
 class JobFailedError(Exception):
     """Raised when a fine-tuning job fails."""
@@ -115,7 +116,7 @@ class ExperimentManager(ExperimentManagerInterface):
         """
         # Check if experiment exists
         if name in self.experiments:
-            raise ValueError(f"Experiment {name} already exists")
+            raise ExperimentExistsError(name)
 
         # Upload dataset file
         file_info = self.client.create_file(

@@ -11,6 +11,7 @@ from openai_finetuner.core.types import (
     CheckpointInfo
 )
 from openai_finetuner.constants import _CACHE_DIR_ENV_VAR
+from openai_finetuner.core.errors import ExperimentExistsError
 
 @pytest.fixture
 def mock_client():
@@ -84,12 +85,14 @@ def test_create_experiment_duplicate_name(experiment_manager):
         name="test_experiment"
     )
 
-    with pytest.raises(ValueError, match="Experiment test_experiment already exists"):
+    with pytest.raises(ExperimentExistsError) as exc_info:
         experiment_manager.create_experiment(
             dataset_id="test_dataset",
             base_model="gpt-3.5-turbo",
             name="test_experiment"
         )
+    
+    assert exc_info.value.experiment_name == "test_experiment"
 
 def test_create_experiment_failed_job(experiment_manager, mock_client):
     """Test handling of failed job creation"""
