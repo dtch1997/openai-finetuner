@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import Mock
+import os
 
 from openai_finetuner.experiment import ExperimentManager, JobFailedError
 from openai_finetuner.core.types import (
@@ -9,6 +10,8 @@ from openai_finetuner.core.types import (
     FileInfo,
     CheckpointInfo
 )
+from openai_finetuner.constants import _CACHE_DIR_ENV_VAR
+from openai_finetuner.core.errors import ExperimentExistsError
 
 @pytest.fixture
 def mock_client():
@@ -82,12 +85,14 @@ def test_create_experiment_duplicate_name(experiment_manager):
         name="test_experiment"
     )
 
-    with pytest.raises(ValueError, match="Experiment test_experiment already exists"):
+    with pytest.raises(ExperimentExistsError) as exc_info:
         experiment_manager.create_experiment(
             dataset_id="test_dataset",
             base_model="gpt-3.5-turbo",
             name="test_experiment"
         )
+    
+    assert exc_info.value.experiment_name == "test_experiment"
 
 def test_create_experiment_failed_job(experiment_manager, mock_client):
     """Test handling of failed job creation"""
@@ -260,3 +265,97 @@ def test_get_latest_checkpoint(experiment_manager, mock_client):
     assert isinstance(checkpoint, CheckpointInfo)
     assert checkpoint.id == "checkpoint-123"
     assert checkpoint.model == "ft:gpt-3.5-turbo:org:test:123"
+
+def test_experiment_manager_uses_env_cache_dir(mock_client, mock_dataset_manager, tmp_path):
+    """Test that ExperimentManager uses the cache directory from environment variable."""
+    custom_cache_dir = tmp_path / "custom_cache"
+    os.environ[_CACHE_DIR_ENV_VAR] = str(custom_cache_dir)
+    
+    try:
+        # Create manager without explicit base_dir
+        manager = ExperimentManager(
+            client=mock_client,
+            dataset_manager=mock_dataset_manager
+        )
+        
+        # Verify it uses the custom cache dir
+        assert manager.base_dir == custom_cache_dir
+        assert manager.experiments_file == custom_cache_dir / "experiments.json"
+        
+        # Test functionality with custom cache dir
+        experiment = manager.create_experiment(
+            dataset_id="test_dataset",
+            base_model="gpt-3.5-turbo",
+            name="test_experiment"
+        )
+        
+        # Verify data persistence
+        loaded_experiment = manager.get_experiment_info("test_experiment")
+        assert loaded_experiment.name == experiment.name
+        assert loaded_experiment.dataset_id == experiment.dataset_id
+        
+        # Verify file was created in correct location
+        assert manager.experiments_file.exists()
+        
+    finally:
+        # Clean up environment
+        del os.environ[_CACHE_DIR_ENV_VAR]
+
+def test_experiment_manager_env_cache_dir_persistence(mock_client, mock_dataset_manager, tmp_path):
+    """Test that experiments persist between manager instances when using env cache dir."""
+    custom_cache_dir = tmp_path / "custom_cache"
+    os.environ[_CACHE_DIR_ENV_VAR] = str(custom_cache_dir)
+    
+    try:
+        # Create first manager instance
+        manager1 = ExperimentManager(
+            client=mock_client,
+            dataset_manager=mock_dataset_manager
+        )
+        
+        # Create an experiment
+        manager1.create_experiment(
+            dataset_id="test_dataset",
+            base_model="gpt-3.5-turbo",
+            name="test_experiment"
+        )
+        
+        # Create second manager instance
+        manager2 = ExperimentManager(
+            client=mock_client,
+            dataset_manager=mock_dataset_manager
+        )
+        
+        # Verify experiment exists in second instance
+        experiment = manager2.get_experiment_info("test_experiment")
+        assert experiment.name == "test_experiment"
+        assert experiment.dataset_id == "test_dataset"
+        assert manager2.base_dir == custom_cache_dir
+        
+    finally:
+        # Clean up environment
+        del os.environ[_CACHE_DIR_ENV_VAR]
+
+def test_create_experiment_exist_ok(experiment_manager):
+    """Test that exist_ok=True returns existing experiment instead of raising error"""
+    # Create first experiment
+    first_experiment = experiment_manager.create_experiment(
+        dataset_id="test_dataset",
+        base_model="gpt-3.5-turbo",
+        name="test_experiment"
+    )
+
+    # Create second experiment with same name but exist_ok=True
+    second_experiment = experiment_manager.create_experiment(
+        dataset_id="different_dataset",  # Different dataset
+        base_model="gpt-4",  # Different model
+        name="test_experiment",
+        exist_ok=True
+    )
+
+    # Verify we got back the original experiment
+    assert second_experiment.name == first_experiment.name
+    assert second_experiment.dataset_id == first_experiment.dataset_id
+    assert second_experiment.base_model == first_experiment.base_model
+    assert second_experiment.file_id == first_experiment.file_id
+    assert second_experiment.job_id == first_experiment.job_id

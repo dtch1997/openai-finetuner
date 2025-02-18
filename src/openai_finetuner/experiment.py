@@ -18,6 +18,7 @@ from .core.types import (
 )
 from .constants import get_cache_dir
 from .dataset import DatasetManager
+from .core.errors import ExperimentExistsError
 
 class JobFailedError(Exception):
     """Raised when a fine-tuning job fails."""
@@ -70,11 +71,11 @@ class ExperimentManager(ExperimentManagerInterface):
         self,
         client: Optional[ClientInterface] = None,
         dataset_manager: Optional[DatasetManager] = None,
-        base_dir: pathlib.Path = get_cache_dir()
+        base_dir: pathlib.Path | None = None
     ):
         self.client = client or CacheWrapper(OpenAIClient())
-        self.dataset_manager = dataset_manager or DatasetManager()
-        self.base_dir = pathlib.Path(base_dir)
+        self.base_dir = base_dir or get_cache_dir()
+        self.dataset_manager = dataset_manager or DatasetManager(self.base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.experiments_file = self.base_dir / "experiments.json"
         self._load_experiments()
@@ -99,7 +100,9 @@ class ExperimentManager(ExperimentManagerInterface):
         dataset_id: str,
         base_model: str,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        name: Optional[str] = None
+        name: Optional[str] = None,
+        *,
+        exist_ok: bool = False
     ) -> ExperimentInfo:
         """
         Create and run a fine-tuning experiment.
@@ -109,13 +112,19 @@ class ExperimentManager(ExperimentManagerInterface):
             dataset_id: ID of dataset to use for training
             base_model: Base model to fine-tune
             hyperparameters: Optional hyperparameters for fine-tuning
+            exist_ok: If True, return existing experiment instead of raising error
             
         Returns:
             ExperimentInfo containing details about the experiment
+            
+        Raises:
+            ExperimentExistsError: If experiment with name already exists and exist_ok=False
         """
         # Check if experiment exists
         if name in self.experiments:
-            raise ValueError(f"Experiment {name} already exists")
+            if exist_ok:
+                return self.get_experiment_info(name)
+            raise ExperimentExistsError(name)
 
         # Upload dataset file
         file_info = self.client.create_file(
